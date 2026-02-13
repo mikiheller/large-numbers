@@ -2,72 +2,51 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>Zoom the Number</title>
-  <link rel="stylesheet" href="css/style.css" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fuel Run — Collect fuel. Reach the stars.</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800&family=Exo+2:wght@400;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css?v=3" />
 </head>
 <body>
-  <div id="app">
-    <header class="header">
-      <nav class="mode-nav">
-        <button type="button" class="mode-btn active" data-mode="sandbox" aria-label="Sandbox mode">Sandbox</button>
-        <button type="button" class="mode-btn" data-mode="quests" aria-label="Quests mode">Quests</button>
-      </nav>
-      <button type="button" class="mute-btn" aria-label="Mute sound">🔊</button>
+  <div class="starfield" aria-hidden="true"></div>
+
+  <main class="game-frame">
+    <header class="hud">
+      <div class="hud-mission">
+        <span class="label" id="missionLabel">Mission 1</span>
+        <span class="mission-name" id="missionSubtitle">Collect fuel</span>
+      </div>
+      <div class="hud-ship-msg" id="shipMsg" hidden>
+        Land on pad to launch!
+      </div>
     </header>
 
-    <!-- Sandbox -->
-    <main id="sandbox" class="mode-panel active">
-      <div class="total-row">
-        <button type="button" id="total-display" class="total-display" aria-label="Tap to hear number">0</button>
-      </div>
-      <div class="bins-row" id="bins-row"></div>
-      <div class="controls-row">
-        <button type="button" id="btn-minus" class="big-btn minus" aria-label="Remove one">−</button>
-        <span class="selected-unit-label" id="selected-unit-label">Pick a bin</span>
-        <button type="button" id="btn-plus" class="big-btn plus" aria-label="Add one">+</button>
-      </div>
-      <div class="zoom-section">
-        <div class="zoom-milestones">
-          <span data-value="0">0</span>
-          <span data-value="1000">1K</span>
-          <span data-value="10000">10K</span>
-          <span data-value="100000">100K</span>
-          <span data-value="1000000">1M</span>
+    <div class="game-wrapper">
+      <canvas id="gameCanvas" width="900" height="600"></canvas>
+      <div class="ship-zone-label" id="shipZoneLabel">Launch pad</div>
+      
+      <div class="intro-overlay" id="introOverlay">
+        <div class="intro-mission-num" id="introMissionNum">Mission 1</div>
+        <div class="intro-mission-text">
+          Your mission: Collect
+          <span class="intro-number" id="introNumber">one hundred twenty</span>
+          pounds of fuel.
         </div>
-        <input type="range" id="zoom-slider" class="zoom-slider" min="0" max="1000000" value="0" step="1000" />
-        <div class="jump-buttons">
-          <button type="button" class="jump-btn" data-value="1000">1,000</button>
-          <button type="button" class="jump-btn" data-value="10000">10,000</button>
-          <button type="button" class="jump-btn" data-value="100000">100,000</button>
-          <button type="button" class="jump-btn" data-value="1000000">1,000,000</button>
-        </div>
+        <div class="intro-question">Which is the right way to write that number?</div>
+        <input type="text" class="intro-input" id="introInput" placeholder="Type here..." autocomplete="off" />
+        <div class="intro-hint" id="introHint"></div>
+        <div class="intro-enter">Press ENTER to check</div>
       </div>
-      <div id="celebration" class="celebration hidden" aria-live="polite"></div>
-    </main>
+    </div>
 
-    <!-- Quests -->
-    <main id="quests" class="mode-panel">
-      <div class="quest-header">
-        <span class="quest-progress" id="quest-progress">1 / 15</span>
-        <div class="quest-stars" id="quest-stars"></div>
-      </div>
-      <div class="quest-prompt" id="quest-prompt"></div>
-      <div class="quest-area" id="quest-area"></div>
-      <div class="quest-feedback hidden" id="quest-feedback">
-        <div class="quest-feedback-inner">
-          <p id="quest-feedback-text"></p>
-          <button type="button" id="quest-next-btn" class="big-btn next-btn">Next</button>
-        </div>
-      </div>
-      <div id="quest-celebration" class="celebration hidden" aria-live="polite"></div>
-    </main>
-  </div>
+    <div class="instructions">
+      <span>WASD or arrows to move</span>
+      <span>Collect fuel, land on the pad, then Space or E to launch</span>
+    </div>
+  </main>
 
-  <script src="js/model.js"></script>
-  <script src="js/audio.js"></script>
-  <script src="js/sandbox.js"></script>
-  <script src="js/quests.js"></script>
-  <script src="js/app.js"></script>
+  <script src="game.js?v=3"></script>
 </body>
 </html>
