@@ -17,8 +17,8 @@
   // Generate a random target for each mission
   function generateTarget(missionNum) {
     if (missionNum === 1) {
-      // First mission: random number between 20 and 149
-      return Math.floor(Math.random() * 130) + 20;
+      // First mission: start around 100
+      return Math.floor(Math.random() * 100) + 50;
     }
     // Each subsequent mission: previous target * (1.5 to 2.5)
     const multiplier = 1.5 + Math.random();
@@ -52,6 +52,145 @@
   const introInput = document.getElementById('introInput');
   const introHint = document.getElementById('introHint');
   const introEnter = document.querySelector('.intro-enter');
+  const introHelpBtn = document.getElementById('introHelpBtn');
+  const helpModal = document.getElementById('helpModal');
+  const helpWords = document.getElementById('helpWords');
+  const helpBoxes = document.getElementById('helpBoxes');
+  const helpLabels = document.getElementById('helpLabels');
+  const helpCheckBtn = document.getElementById('helpCheckBtn');
+  const helpResult = document.getElementById('helpResult');
+
+  // Big grouped chunks (thousands and above)
+  const BIG_GROUPS = [
+    { name: 'billions',  divisor: 1000000000 },
+    { name: 'millions',  divisor: 1000000 },
+    { name: 'thousands', divisor: 1000 },
+  ];
+
+  function getHelpSlots(n) {
+    // Returns array of { name, answer, type:'big'|'small' }
+    // Big fat boxes for thousands/millions/billions, small per-digit for hundreds/tens/ones
+    const slots = [];
+    let remaining = n;
+
+    for (const g of BIG_GROUPS) {
+      const val = Math.floor(remaining / g.divisor);
+      remaining = remaining % g.divisor;
+      if (val > 0) {
+        slots.push({ name: g.name, answer: val.toString(), type: 'big' });
+      }
+    }
+
+    // Now remaining is 0-999 — split into individual hundreds, tens, ones
+    const h = Math.floor(remaining / 100);
+    const t = Math.floor((remaining % 100) / 10);
+    const o = remaining % 10;
+
+    // Only show digits starting from the first non-zero, but always show ones
+    let started = (slots.length === 0); // if no big groups, always show from hundreds
+    if (h > 0 || started) { slots.push({ name: 'hundreds', answer: h.toString(), type: 'small' }); started = true; }
+    if (t > 0 || started) { slots.push({ name: 'tens', answer: t.toString(), type: 'small' }); started = true; }
+    slots.push({ name: 'ones', answer: o.toString(), type: 'small' });
+
+    return slots;
+  }
+
+  function openHelpModal() {
+    const slots = getHelpSlots(target);
+    
+    helpWords.textContent = numberToWords(target);
+    helpBoxes.innerHTML = '';
+    helpLabels.innerHTML = '';
+    helpResult.textContent = '';
+    
+    for (let i = 0; i < slots.length; i++) {
+      const s = slots[i];
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.inputMode = 'numeric';
+      input.className = 'help-box';
+      input.dataset.idx = i;
+      input.dataset.answer = s.answer;
+      input.placeholder = '?';
+
+      if (s.type === 'big') {
+        input.classList.add('help-box-fat');
+        input.maxLength = 3;
+      } else {
+        input.classList.add('help-box-small');
+        input.maxLength = 1;
+      }
+
+      // Auto-advance
+      input.addEventListener('input', function () {
+        input.classList.remove('correct', 'wrong');
+        const maxLen = s.type === 'small' ? 1 : s.answer.length;
+        if (input.value.length >= maxLen && i < slots.length - 1) {
+          helpBoxes.children[i + 1].focus();
+        }
+      });
+      // Backspace on empty moves to previous box
+      input.addEventListener('keydown', function (e) {
+        if (e.key === 'Backspace' && input.value === '' && i > 0) {
+          e.preventDefault();
+          helpBoxes.children[i - 1].focus();
+        }
+      });
+      helpBoxes.appendChild(input);
+      
+      // Label
+      const label = document.createElement('div');
+      label.className = 'help-label';
+      if (s.type === 'big') {
+        label.classList.add('help-label-fat');
+      } else {
+        label.classList.add('help-label-small');
+      }
+      label.textContent = s.name;
+      helpLabels.appendChild(label);
+    }
+    
+    helpModal.hidden = false;
+    helpBoxes.children[0].focus();
+  }
+
+  function checkHelpBoxes() {
+    const boxes = helpBoxes.querySelectorAll('.help-box');
+    let allCorrect = true;
+    
+    boxes.forEach(box => {
+      const val = box.value.trim();
+      if (val === box.dataset.answer) {
+        box.classList.remove('wrong');
+        box.classList.add('correct');
+      } else {
+        box.classList.remove('correct');
+        box.classList.add('wrong');
+        allCorrect = false;
+      }
+    });
+    
+    if (allCorrect) {
+      helpResult.textContent = `That's right! It's ${formatNum(target)}`;
+      // Auto-fill the main input and close after a moment
+      setTimeout(() => {
+        introInput.value = target.toString();
+        helpModal.hidden = true;
+        introInput.focus();
+      }, 1500);
+    }
+  }
+
+  introHelpBtn.addEventListener('click', openHelpModal);
+  helpCheckBtn.addEventListener('click', checkHelpBoxes);
+
+  // Allow Enter in help boxes to check
+  document.addEventListener('keydown', function (e) {
+    if (!helpModal.hidden && e.key === 'Enter') {
+      e.preventDefault();
+      checkHelpBoxes();
+    }
+  });
 
   // Return all denominations needed to represent any digit of the target
   function getDenomsForTarget(t) {
@@ -105,10 +244,6 @@
     const onesEntry = needed.find(n => n.value === 1);
     if (onesEntry && onesEntry.count > 9) onesEntry.count = 9;
     
-    // Build final list: needed pickups (these make the solution possible)
-    const counts = needed.map(n => ({ ...n }));
-    
-    // Figure out how many pickups can actually fit in the play area
     const padding = 50;
     const safeTop = padding;
     const safeBottom = SHIP_ZONE.y - 40;
@@ -116,48 +251,68 @@
     const safeRight = PANEL_X - 20; // Leave room for collected pane
     const areaW = safeRight - safeLeft;
     const areaH = safeBottom - safeTop;
-    const avgRadius = 28; // rough average pickup radius
     const minGap = 20;
+
+    // Helper to try placing a pickup
+    function tryPlace(value, required) {
+      let attempts = 0;
+      let x, y;
+      let placed = false;
+      do {
+        x = safeLeft + Math.random() * areaW;
+        y = safeTop + Math.random() * areaH;
+        attempts++;
+        const ok = !pickups.some(p => {
+          const r1 = pickupRadius(value);
+          const r2 = pickupRadius(p.value);
+          return dist(x, y, p.x, p.y) < r1 + r2 + minGap;
+        });
+        if (ok) { placed = true; break; }
+      } while (attempts < 80);
+      
+      // Required pickups ALWAYS get placed (with reduced gap if needed)
+      if (!placed && required) {
+        attempts = 0;
+        do {
+          x = safeLeft + Math.random() * areaW;
+          y = safeTop + Math.random() * areaH;
+          attempts++;
+          const ok = !pickups.some(p => {
+            const r1 = pickupRadius(value);
+            const r2 = pickupRadius(p.value);
+            return dist(x, y, p.x, p.y) < r1 + r2; // no extra gap, just no full overlap
+          });
+          if (ok) { placed = true; break; }
+        } while (attempts < 80);
+        
+        // Last resort: just place it somewhere
+        if (!placed) placed = true;
+      }
+      
+      if (placed) {
+        pickups.push({ x, y, value, id: Math.random() });
+      }
+      return placed;
+    }
+
+    // 1) Spawn NEEDED pickups first — these are always placed
+    for (const { value, count } of needed) {
+      for (let i = 0; i < count; i++) {
+        tryPlace(value, true);
+      }
+    }
+    
+    // 2) Spawn distractors — these are skippable
+    const avgRadius = 28;
     const cellSize = (avgRadius * 2) + minGap;
-    const maxPickups = Math.floor((areaW / cellSize) * (areaH / cellSize) * 0.7); // 70% fill
-    
-    const neededTotal = counts.reduce((s, c) => s + c.count, 0);
-    
-    // Add distractors, but only if we have room
-    // Aim for ~30% extra, capped by available space
+    const maxPickups = Math.floor((areaW / cellSize) * (areaH / cellSize) * 0.7);
+    const neededTotal = needed.reduce((s, n) => s + n.count, 0);
     const roomForExtras = Math.max(0, maxPickups - neededTotal);
     const desiredExtras = Math.min(roomForExtras, Math.max(3, Math.floor(neededTotal * 0.3)));
     
     for (let i = 0; i < desiredExtras; i++) {
       const d = denoms[Math.floor(Math.random() * denoms.length)];
-      const entry = counts.find(c => c.value === d);
-      if (entry) entry.count++;
-      else counts.push({ value: d, count: 1 });
-    }
-
-    // Spawn with collision detection — stop if we can't place without overlap
-    for (const { value, count } of counts) {
-      for (let i = 0; i < count; i++) {
-        let attempts = 0;
-        let x, y;
-        let placed = false;
-        do {
-          x = safeLeft + Math.random() * (areaW);
-          y = safeTop + Math.random() * (areaH);
-          attempts++;
-          const ok = !pickups.some(p => {
-            const r1 = pickupRadius(value);
-            const r2 = pickupRadius(p.value);
-            return dist(x, y, p.x, p.y) < r1 + r2 + minGap;
-          });
-          if (ok) { placed = true; break; }
-        } while (attempts < 80);
-        
-        if (placed) {
-          pickups.push({ x, y, value, id: Math.random() });
-        }
-        // If we couldn't place it, skip — don't force overlapping pickups
-      }
+      tryPlace(d, false);
     }
   }
 
@@ -201,7 +356,9 @@
     introNumber.textContent = numberToWords(target);
     introInput.value = '';
     introInput.classList.remove('wrong');
+    introHelpBtn.classList.remove('glow');
     introHint.textContent = '';
+    helpModal.hidden = true;
     setTimeout(() => introInput.focus(), 100);
   }
 
@@ -264,8 +421,9 @@
       missionState = 'playing';
       spawnPickups();
     } else {
-      // Wrong - flash red
+      // Wrong - flash red and light up help button
       introInput.classList.add('wrong');
+      introHelpBtn.classList.add('glow');
       setTimeout(() => introInput.classList.remove('wrong'), 800);
     }
   }
@@ -312,7 +470,7 @@
       .sort((a, b) => b.value - a.value);
   }
 
-  const PANEL_W = 160;
+  const PANEL_W = 220;
   const PANEL_X = W - PANEL_W;
 
   // Mouse click handling for collected items minus buttons
@@ -422,14 +580,12 @@
         if (diff === 0) {
           canLaunch = true;
           shipMsg.textContent = 'Perfect! Press SPACE or E to launch!';
-          shipMsg.hidden = false;
-        } else if (diff > 0) {
-          canLaunch = false;
-          shipMsg.textContent = `${formatNum(diff)} extra`;
+          shipMsg.style.color = '';
           shipMsg.hidden = false;
         } else {
           canLaunch = false;
-          shipMsg.textContent = `${formatNum(-diff)} more`;
+          shipMsg.textContent = 'Not ready!';
+          shipMsg.style.color = '#ff6666';
           shipMsg.hidden = false;
         }
       } else {
@@ -697,11 +853,11 @@
       ctx.font = font;
       
       // Column positions (right-aligned denomination, center ×, right-aligned count, center =, right-aligned subtotal)
-      const colDenom = PANEL_X + 50;   // right edge of denomination
-      const colX     = PANEL_X + 58;   // ×
-      const colCount = PANEL_X + 72;   // count
-      const colEq    = PANEL_X + 80;   // =
-      const colTotal = PANEL_X + PANEL_W - 36; // right edge of subtotal
+      const colDenom = PANEL_X + 62;   // right edge of denomination
+      const colX     = PANEL_X + 72;   // ×
+      const colCount = PANEL_X + 86;   // count
+      const colEq    = PANEL_X + 100;  // =
+      const colTotal = PANEL_X + PANEL_W - 40; // right edge of subtotal
       
       // Denomination (right-aligned)
       ctx.textAlign = 'right';

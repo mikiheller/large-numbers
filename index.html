@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800&family=Exo+2:wght@400;600&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css?v=3" />
+  <link rel="stylesheet" href="styles.css?v=4" />
 </head>
 <body>
   <div class="starfield" aria-hidden="true"></div>
@@ -38,6 +38,17 @@
         <input type="text" class="intro-input" id="introInput" placeholder="Type here..." autocomplete="off" />
         <div class="intro-hint" id="introHint"></div>
         <div class="intro-enter">Press ENTER to check</div>
+        <button class="intro-help-btn" id="introHelpBtn">I need help!</button>
+        
+        <div class="help-modal" id="helpModal" hidden>
+          <div class="help-modal-inner">
+            <div class="help-words" id="helpWords">two thousand three hundred fifty-nine</div>
+            <div class="help-boxes" id="helpBoxes"></div>
+            <div class="help-labels" id="helpLabels"></div>
+            <button class="help-check-btn" id="helpCheckBtn">Check</button>
+            <div class="help-result" id="helpResult"></div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -47,6 +58,6 @@
     </div>
   </main>
 
-  <script src="game.js?v=3"></script>
+  <script src="game.js?v=4"></script>
 </body>
 </html>
