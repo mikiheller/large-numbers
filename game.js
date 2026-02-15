@@ -593,7 +593,7 @@
     const y = (e.clientY - rect.top) * scaleY;
     
     const rowHeight = 44;
-    const startY = 55;
+    const startY = 60;
     const groups = getCollectedGroups();
     
     if (x >= PANEL_X && x <= W) {
@@ -1023,19 +1023,32 @@
     ctx.fillRect(PANEL_X, 0, PANEL_W, H);
     ctx.strokeRect(PANEL_X, 0, PANEL_W, H);
     
-    // Total: "fuel / target"
-    const totalStr = `${formatNum(fuel)} / ${formatNum(target)}`;
-    ctx.fillStyle = fuel === target ? 'rgba(50, 200, 100, 0.9)' : fuel > target ? 'rgba(255, 100, 100, 0.9)' : 'rgba(255, 255, 255, 0.9)';
-    ctx.font = '700 18px "Exo 2", sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText(totalStr, PANEL_X + PANEL_W / 2, 30);
+    // Have / Need labels
+    const haveColor = fuel === target ? 'rgba(50, 200, 100, 0.9)' : fuel > target ? 'rgba(255, 100, 100, 0.9)' : 'rgba(255, 255, 255, 0.9)';
+    ctx.font = '700 16px "Exo 2", sans-serif';
+    
+    // "Have: X"
+    ctx.textAlign = 'left';
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+    ctx.fillText('Have:', PANEL_X + 10, 22);
+    ctx.fillStyle = haveColor;
+    ctx.textAlign = 'right';
+    ctx.fillText(formatNum(fuel), PANEL_X + PANEL_W - 10, 22);
+    
+    // "Need: X"
+    ctx.textAlign = 'left';
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+    ctx.fillText('Need:', PANEL_X + 10, 42);
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+    ctx.textAlign = 'right';
+    ctx.fillText(formatNum(target), PANEL_X + PANEL_W - 10, 42);
     
     // Separator line
     ctx.strokeStyle = 'rgba(50, 200, 100, 0.3)';
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.moveTo(PANEL_X + 10, 45);
-    ctx.lineTo(PANEL_X + PANEL_W - 10, 45);
+    ctx.moveTo(PANEL_X + 10, 52);
+    ctx.lineTo(PANEL_X + PANEL_W - 10, 52);
     ctx.stroke();
     
     // Grouped denomination rows
