@@ -18,11 +18,20 @@
   const GHOST_SPEED = 160;
   const GHOST_SIZE = 22;
   const GHOST_HIT_COOLDOWN = 1.5; // seconds of invincibility after being hit
-  const ghostImg = new Image();
-  ghostImg.src = 'echo.webp';
-  const ghostMusic = new Audio('echo.mp3');
-  ghostMusic.loop = true;
-  ghostMusic.volume = 0.4;
+
+  // Ghost variants — each has an image and a music track
+  const GHOST_NAMES = ['echo', 'j3vu', 'daisy09', 'tiptoe', 'pbbv'];
+  const ghostVariants = GHOST_NAMES.map(name => {
+    const img = new Image();
+    img.src = name + '.webp';
+    const music = new Audio(name + '.mp3');
+    music.loop = true;
+    music.volume = 0.4;
+    return { name, img, music };
+  });
+  let currentGhostVariant = null;
+  let lastGhostName = null; // prevent same ghost twice in a row
+
   let ghost = null; // { x, y, vx, vy, wobblePhase }
   let ghostHitCooldown = 0; // countdown timer
 
@@ -133,19 +142,28 @@
         input.maxLength = 1;
       }
 
-      // Auto-advance
+      // Auto-advance (skip comma separators)
       input.addEventListener('input', function () {
         input.classList.remove('correct', 'wrong');
         const maxLen = s.type === 'small' ? 1 : s.answer.length;
         if (input.value.length >= maxLen && i < slots.length - 1) {
-          helpBoxes.children[i + 1].focus();
+          // Find next input element (skip commas)
+          const allInputs = helpBoxes.querySelectorAll('.help-box');
+          const myIdx = Array.from(allInputs).indexOf(input);
+          if (myIdx >= 0 && myIdx < allInputs.length - 1) {
+            allInputs[myIdx + 1].focus();
+          }
         }
       });
-      // Backspace on empty moves to previous box
+      // Backspace on empty moves to previous box (skip commas)
       input.addEventListener('keydown', function (e) {
         if (e.key === 'Backspace' && input.value === '' && i > 0) {
           e.preventDefault();
-          helpBoxes.children[i - 1].focus();
+          const allInputs = helpBoxes.querySelectorAll('.help-box');
+          const myIdx = Array.from(allInputs).indexOf(input);
+          if (myIdx > 0) {
+            allInputs[myIdx - 1].focus();
+          }
         }
       });
       helpBoxes.appendChild(input);
@@ -160,6 +178,18 @@
       }
       label.textContent = s.name;
       helpLabels.appendChild(label);
+
+      // Add comma separator after each big group (before the next slot)
+      if (s.type === 'big' && i < slots.length - 1) {
+        const commaBox = document.createElement('span');
+        commaBox.className = 'help-comma';
+        commaBox.textContent = ',';
+        helpBoxes.appendChild(commaBox);
+
+        const commaLabel = document.createElement('div');
+        commaLabel.className = 'help-comma-label';
+        helpLabels.appendChild(commaLabel);
+      }
     }
     
     helpModal.hidden = false;
@@ -328,7 +358,23 @@
     }
   }
 
+  function pickGhostVariant() {
+    // Pick a random ghost, but never the same one twice in a row
+    const available = ghostVariants.filter(v => v.name !== lastGhostName);
+    const pick = available[Math.floor(Math.random() * available.length)];
+    lastGhostName = pick.name;
+    return pick;
+  }
+
   function spawnGhost() {
+    // Stop any currently playing ghost music
+    if (currentGhostVariant) {
+      currentGhostVariant.music.pause();
+    }
+
+    // Pick a new random ghost variant
+    currentGhostVariant = pickGhostVariant();
+
     // Spawn ghost at a random position, away from the player
     const padding = 60;
     const safeTop = padding;
@@ -382,7 +428,9 @@
     pickups = []; // Clear pickups - will spawn after quiz
     ghost = null;
     ghostHitCooldown = 0;
-    ghostMusic.pause();
+    if (currentGhostVariant) {
+      currentGhostVariant.music.pause();
+    }
     canLaunch = false;
     launchPressed = false;
     // Hide HUD text during intro (don't spoil the answer)
@@ -464,8 +512,8 @@
       missionState = 'playing';
       spawnPickups();
       spawnGhost();
-      ghostMusic.currentTime = 0;
-      ghostMusic.play().catch(() => {});
+      currentGhostVariant.music.currentTime = 0;
+      currentGhostVariant.music.play().catch(() => {});
     } else {
       // Wrong - flash red and light up help button
       introInput.classList.add('wrong');
@@ -473,6 +521,21 @@
       setTimeout(() => introInput.classList.remove('wrong'), 800);
     }
   }
+
+  // Auto-format intro input with commas as you type
+  introInput.addEventListener('input', function () {
+    // Strip non-digits, format with commas, preserve cursor position
+    const raw = introInput.value.replace(/[^0-9]/g, '');
+    if (raw === '') { introInput.value = ''; return; }
+    const formatted = Number(raw).toLocaleString();
+    // Figure out where cursor should go after reformatting
+    const selEnd = introInput.selectionEnd;
+    const commasBefore = (introInput.value.slice(0, selEnd).match(/,/g) || []).length;
+    introInput.value = formatted;
+    const commasAfter = (formatted.slice(0, selEnd).match(/,/g) || []).length;
+    const newPos = selEnd + (commasAfter - commasBefore);
+    introInput.setSelectionRange(newPos, newPos);
+  });
 
   // Handle ENTER on intro input
   introInput.addEventListener('keydown', function (e) {
@@ -877,7 +940,7 @@
     }
     
     // Ghost
-    if (ghost && ghostImg.complete) {
+    if (ghost && currentGhostVariant && currentGhostVariant.img.complete) {
       const ghostAlpha = ghostHitCooldown > 0
         ? 0.3 + 0.3 * Math.sin(t * 15) // flicker when player is invincible
         : 0.85;
@@ -890,7 +953,7 @@
       ctx.shadowBlur = 18 + 6 * Math.sin(t * 3);
 
       ctx.drawImage(
-        ghostImg,
+        currentGhostVariant.img,
         ghost.x - drawSize / 2,
         ghost.y - drawSize / 2 + bobY,
         drawSize,

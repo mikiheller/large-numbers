@@ -401,6 +401,22 @@ body {
   min-width: 84px;
 }
 
+.help-comma {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.8rem;
+  color: rgba(255, 255, 255, 0.5);
+  align-self: center;
+  margin: 0 -2px;
+  flex-shrink: 0;
+}
+
+.help-comma-label {
+  width: 12px;
+  min-width: 12px;
+  flex-shrink: 0;
+}
+
 .help-check-btn {
   background: var(--accent-cyan);
   border: none;
