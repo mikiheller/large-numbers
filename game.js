@@ -593,7 +593,7 @@
     const y = (e.clientY - rect.top) * scaleY;
     
     const rowHeight = 44;
-    const startY = 70;
+    const startY = 55;
     const groups = getCollectedGroups();
     
     if (x >= PANEL_X && x <= W) {
