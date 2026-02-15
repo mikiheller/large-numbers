@@ -14,14 +14,26 @@
 
   const DENOMINATIONS = [1, 10, 100, 1000, 10000, 100000];
 
+  // Ghost enemy
+  const GHOST_SPEED = 160;
+  const GHOST_SIZE = 22;
+  const GHOST_HIT_COOLDOWN = 1.5; // seconds of invincibility after being hit
+  const ghostImg = new Image();
+  ghostImg.src = 'echo.webp';
+  const ghostMusic = new Audio('echo.mp3');
+  ghostMusic.loop = true;
+  ghostMusic.volume = 0.4;
+  let ghost = null; // { x, y, vx, vy, wobblePhase }
+  let ghostHitCooldown = 0; // countdown timer
+
   // Generate a random target for each mission
   function generateTarget(missionNum) {
     if (missionNum === 1) {
-      // First mission: start around 100
-      return Math.floor(Math.random() * 100) + 50;
+      // First mission: start around 200-500
+      return Math.floor(Math.random() * 300) + 200;
     }
-    // Each subsequent mission: previous target * (1.5 to 2.5)
-    const multiplier = 1.5 + Math.random();
+    // Each subsequent mission: previous target * (2.5 to 4.0)
+    const multiplier = 2.5 + Math.random() * 1.5;
     const raw = Math.round(lastTarget * multiplier);
     return raw;
   }
@@ -316,6 +328,34 @@
     }
   }
 
+  function spawnGhost() {
+    // Spawn ghost at a random position, away from the player
+    const padding = 60;
+    const safeTop = padding;
+    const safeBottom = SHIP_ZONE.y - 40;
+    const safeLeft = padding;
+    const safeRight = PANEL_X - 20;
+
+    let x, y;
+    let attempts = 0;
+    do {
+      x = safeLeft + Math.random() * (safeRight - safeLeft);
+      y = safeTop + Math.random() * (safeBottom - safeTop);
+      attempts++;
+    } while (dist(x, y, player.x, player.y) < 150 && attempts < 50);
+
+    // Random direction
+    const angle = Math.random() * Math.PI * 2;
+    ghost = {
+      x: x,
+      y: y,
+      vx: Math.cos(angle) * GHOST_SPEED,
+      vy: Math.sin(angle) * GHOST_SPEED,
+      wobblePhase: Math.random() * Math.PI * 2,
+    };
+    ghostHitCooldown = 0;
+  }
+
   function isInShipZone(x, y) {
     return x >= SHIP_ZONE.x && x <= SHIP_ZONE.x + SHIP_ZONE.w &&
            y >= SHIP_ZONE.y && y <= SHIP_ZONE.y + SHIP_ZONE.h;
@@ -340,6 +380,9 @@
     player.y = PLAYER_START.y;
     player.angle = -Math.PI / 2;
     pickups = []; // Clear pickups - will spawn after quiz
+    ghost = null;
+    ghostHitCooldown = 0;
+    ghostMusic.pause();
     canLaunch = false;
     launchPressed = false;
     // Hide HUD text during intro (don't spoil the answer)
@@ -420,6 +463,9 @@
       document.getElementById('shipZoneLabel').style.visibility = '';
       missionState = 'playing';
       spawnPickups();
+      spawnGhost();
+      ghostMusic.currentTime = 0;
+      ghostMusic.play().catch(() => {});
     } else {
       // Wrong - flash red and light up help button
       introInput.classList.add('wrong');
@@ -612,6 +658,74 @@
           particles.splice(i, 1);
         }
       }
+
+      // Update ghost
+      if (ghost) {
+        const padding = 60;
+        const safeTop = padding;
+        const safeBottom = SHIP_ZONE.y - 40;
+        const safeLeft = padding;
+        const safeRight = PANEL_X - 20;
+
+        // Wobble: slight sine-wave drift perpendicular to travel direction
+        ghost.wobblePhase += dt * 3;
+        const wobbleStrength = 40;
+        const wobbleX = Math.cos(ghost.wobblePhase) * wobbleStrength * dt;
+        const wobbleY = Math.sin(ghost.wobblePhase * 0.7) * wobbleStrength * dt;
+
+        ghost.x += ghost.vx * dt + wobbleX;
+        ghost.y += ghost.vy * dt + wobbleY;
+
+        // Bounce off boundaries
+        if (ghost.x < safeLeft) { ghost.x = safeLeft; ghost.vx = Math.abs(ghost.vx); }
+        if (ghost.x > safeRight) { ghost.x = safeRight; ghost.vx = -Math.abs(ghost.vx); }
+        if (ghost.y < safeTop) { ghost.y = safeTop; ghost.vy = Math.abs(ghost.vy); }
+        if (ghost.y > safeBottom) { ghost.y = safeBottom; ghost.vy = -Math.abs(ghost.vy); }
+
+        // Occasionally change direction slightly for unpredictability
+        if (Math.random() < 0.5 * dt) {
+          const turnAngle = (Math.random() - 0.5) * Math.PI * 0.5;
+          const speed = Math.hypot(ghost.vx, ghost.vy);
+          const angle = Math.atan2(ghost.vy, ghost.vx) + turnAngle;
+          ghost.vx = Math.cos(angle) * speed;
+          ghost.vy = Math.sin(angle) * speed;
+        }
+
+        // Ghost-player collision
+        if (ghostHitCooldown > 0) {
+          ghostHitCooldown -= dt;
+        } else if (dist(player.x, player.y, ghost.x, ghost.y) < PLAYER_SIZE + GHOST_SIZE) {
+          // Player touched the ghost! Drop a collected fuel item
+          if (collected.length > 0) {
+            // Pick a random collected item to drop
+            const dropIdx = Math.floor(Math.random() * collected.length);
+            const dropped = collected[dropIdx];
+            fuel -= dropped.value;
+            collected.splice(dropIdx, 1);
+
+            // Spawn it back at a random position on the board
+            const rx = safeLeft + Math.random() * (safeRight - safeLeft);
+            const ry = safeTop + Math.random() * (safeBottom - safeTop);
+            pickups.push({ x: rx, y: ry, value: dropped.value, id: Math.random() });
+
+            // Spooky hit particles (purple/ghostly)
+            for (let j = 0; j < 10; j++) {
+              const angle = (Math.PI * 2 * j) / 10;
+              particles.push({
+                x: player.x,
+                y: player.y,
+                vx: Math.cos(angle) * 100,
+                vy: Math.sin(angle) * 100,
+                life: 0.6,
+                maxLife: 0.6,
+                size: 4 + Math.random() * 3,
+                hue: 270, // purple/ghostly
+              });
+            }
+          }
+          ghostHitCooldown = GHOST_HIT_COOLDOWN;
+        }
+      }
     }
 
     draw(now);
@@ -762,6 +876,32 @@
       ctx.fillText(label, p.x, p.y);
     }
     
+    // Ghost
+    if (ghost && ghostImg.complete) {
+      const ghostAlpha = ghostHitCooldown > 0
+        ? 0.3 + 0.3 * Math.sin(t * 15) // flicker when player is invincible
+        : 0.85;
+      const bobY = Math.sin(t * 2.5 + ghost.wobblePhase) * 5;
+      const drawSize = GHOST_SIZE * 2.5;
+
+      ctx.save();
+      ctx.globalAlpha = ghostAlpha;
+      ctx.shadowColor = 'rgba(180, 100, 255, 0.7)';
+      ctx.shadowBlur = 18 + 6 * Math.sin(t * 3);
+
+      ctx.drawImage(
+        ghostImg,
+        ghost.x - drawSize / 2,
+        ghost.y - drawSize / 2 + bobY,
+        drawSize,
+        drawSize
+      );
+
+      ctx.shadowBlur = 0;
+      ctx.globalAlpha = 1;
+      ctx.restore();
+    }
+
     // Particles
     for (const part of particles) {
       const alpha = part.life / part.maxLife;
